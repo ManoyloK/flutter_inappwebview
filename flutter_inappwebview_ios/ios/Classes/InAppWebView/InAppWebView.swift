@@ -190,22 +190,26 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
         lastLongPressTouchPoint = touchLocation
 
         evaluateJavaScript("window.\(JAVASCRIPT_BRIDGE_NAME)._findElementsAtPoint(\(touchLocation.x),\(touchLocation.y))", completionHandler: {(value, error) in
-            if error != nil {
-                print("Long press gesture recognizer error: \(error?.localizedDescription ?? "")")
-            } else if let value = value as? [String: Any?] {
-                let hitTestResult = HitTestResult.fromMap(map: value)!
-                self.nativeLoupeGesture = self.gestureRecognizerWithDescriptionFragment("action=loupeGesture:")
-                
-                if sender == self.recognizerForDisablingContextMenuOnLinks,
-                   hitTestResult.type.rawValue > HitTestResultType.unknownType.rawValue,
-                   hitTestResult.type.rawValue < HitTestResultType.editTextType.rawValue {
-                    self.nativeLoupeGesture?.isEnabled = false
-                    self.nativeLoupeGesture?.isEnabled = true
-                } else {
-                    self.channelDelegate?.onLongPressHitTestResult(hitTestResult: hitTestResult)
+            DispatchQueue.main.sync { [weak self] in
+                guard let self = self else { return }
+                if error != nil {
+                    print("Long press gesture recognizer error: \(error?.localizedDescription ?? "")")
+                } else if let value = value as? [String: Any?] {
+
+                    let hitTestResult = HitTestResult.fromMap(map: value)!
+                    self.nativeLoupeGesture = self.gestureRecognizerWithDescriptionFragment("action=loupeGesture:")
+
+                    if sender == self.recognizerForDisablingContextMenuOnLinks,
+                       hitTestResult.type.rawValue > HitTestResultType.unknownType.rawValue,
+                       hitTestResult.type.rawValue < HitTestResultType.editTextType.rawValue {
+                        self.nativeLoupeGesture?.isEnabled = false
+                        self.nativeLoupeGesture?.isEnabled = true
+                    } else {
+                        self.channelDelegate?.onLongPressHitTestResult(hitTestResult: hitTestResult)
+                    }
+                } else if sender == self.longPressRecognizer {
+                    self.channelDelegate?.onLongPressHitTestResult(hitTestResult: HitTestResult(type: .unknownType, extra: nil))
                 }
-            } else if sender == self.longPressRecognizer {
-                self.channelDelegate?.onLongPressHitTestResult(hitTestResult: HitTestResult(type: .unknownType, extra: nil))
             }
         })
     }
@@ -1428,16 +1432,7 @@ public class InAppWebView: WKWebView, UIScrollViewDelegate, WKUIDelegate,
             completionHandler(nil)
         }
     }
-    
-    public override func evaluateJavaScript(_ javaScriptString: String, completionHandler: ((Any?, Error?) -> Void)? = nil) {
-        if let applePayAPIEnabled = settings?.applePayAPIEnabled, applePayAPIEnabled {
-            if let completionHandler = completionHandler {
-                completionHandler(nil, nil)
-            }
-            return
-        }
-        super.evaluateJavaScript(javaScriptString, completionHandler: completionHandler)
-    }
+
     
     @available(iOS 14.0, *)
     public func evaluateJavaScript(_ javaScript: String, frame: WKFrameInfo? = nil, contentWorld: WKContentWorld, completionHandler: ((Result<Any, Error>) -> Void)? = nil) {
